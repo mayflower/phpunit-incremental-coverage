@@ -1,0 +1,21 @@
+{
+    "phpunit": {
+        "phar": "/opt/ws/CoverageAutomation/phpunit-lts.phar",
+        "configuration": "/opt/ws/CoverageAutomation/app/phpunit.xml"
+    },
+    "git": {
+        "cmd": "/usr/bin/git",
+        "root": "/opt/ws/CoverageAutomation",
+        "sources": "src",
+        "tests": "src/tests",
+        "branches": {
+            "master": "",
+            "HEAD": "HEAD"
+        }
+    },
+    "coverage": {
+        "baseDir": "/opt/ws/CoverageAutomation/app",
+        "phpFile": "coverage-{branch}.serialized",
+        "xmlFile": "coverage-{branch}.xml"
+    }
+}
