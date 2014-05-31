@@ -9,7 +9,7 @@
         "sources": "src",
         "tests": "src/tests",
         "branches": {
-            "master": "03843c92b3457af0345fa4aec1c58ade0618900f"
+            "master": "4cde4ce0ddc11c69dfeb1dc6c120f3d5a6450755"
         }
     },
     "coverage": {
