@@ -1,11 +1,11 @@
 {
     "phpunit": {
-        "phar": "../phpunit-lts.phar",
-        "configuration": "../project/app/phpunit.xml"
+        "phar": "/absolute/phpunit-lts.phar",
+        "configuration": "/absolute/phpunit.xml"
     },
     "git": {
         "cmd": "/usr/bin/git",
-        "root": "../project",
+        "root": "/absolute",
         "sources": "src",
         "tests": "src/tests",
         "branches": {
@@ -13,7 +13,7 @@
         }
     },
     "coverage": {
-        "baseDir": "../project/app",
+        "baseDir": "/absolute/app",
         "phpFile": "coverage-{branch}.serialized",
         "xmlFile": "coverage-{branch}.xml"
     }
