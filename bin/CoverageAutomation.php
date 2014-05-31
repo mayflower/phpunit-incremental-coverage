@@ -76,6 +76,7 @@ class CoverageAutomation
             'diff',
             '-U0',
             $this->getProcessedRevision(),
+            $this->getActualRevision(),
             '|',
             'grep',
             '-E',
@@ -182,7 +183,12 @@ class CoverageAutomation
 
     private function updateProcessedRevision()
     {
-        $this->config->git->branches->{$this->branch} = trim(shell_exec($this->config->git->cmd . ' rev-parse HEAD'));
+        $this->config->git->branches->{$this->branch} = $this->getActualRevision();
+    }
+
+    private function getActualRevision()
+    {
+        return trim(shell_exec($this->config->git->cmd . ' rev-parse HEAD'));
     }
 
     private function testFileToFilterClass($filename)
