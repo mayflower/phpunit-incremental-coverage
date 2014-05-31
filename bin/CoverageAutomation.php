@@ -243,11 +243,9 @@ class CoverageAutomation
 
     private function writeBranchCoverage()
     {
-        if (!empty($this->testsDone)) {
-            file_put_contents($this->phpFile, serialize($this->branchCoverage));
-            $clover = new PHP_CodeCoverage_Report_Clover();
-            $clover->process($this->branchCoverage, $this->xmlFile);
-        }
+        file_put_contents($this->phpFile, serialize($this->branchCoverage));
+        $clover = new PHP_CodeCoverage_Report_Clover();
+        $clover->process($this->branchCoverage, $this->xmlFile);
     }
 
     private function writeConfig()

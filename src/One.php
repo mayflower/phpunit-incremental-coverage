@@ -4,9 +4,6 @@ namespace src;
 
 class One
 {
-    /**
-     * @return int
-     */
     public function coveredBy1()
     {
         return $this->coveredBy1And2() - 2;
