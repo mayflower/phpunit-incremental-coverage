@@ -326,7 +326,7 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
             $max = max($max, key($lines));
             for ($i = 0; $i <= $max; $i++) {
                 if (!isset($lines[$i])) {
-                    $lines[$i] = [];
+                    $lines[$i] = null;
                 }
             }
             ksort($lines);

@@ -1,19 +1,20 @@
 {
     "phpunit": {
-        "phar": "/absolute/phpunit-lts.phar",
-        "configuration": "/absolute/phpunit.xml"
+        "phar": "/opt/ws/CoverageAutomation/phpunit-lts.phar",
+        "configuration": "/opt/ws/CoverageAutomation/project/app/phpunit.xml"
     },
     "git": {
         "cmd": "/usr/bin/git",
-        "root": "/absolute",
+        "root": "/opt/ws/CoverageAutomation/project",
         "sources": "src",
         "tests": "src/tests",
         "branches": {
-            "master": ""
+            "master": "b807bb0ef8308b175a137d2c21184cc36d122f82",
+            "HEAD": "b807bb0ef8308b175a137d2c21184cc36d122f82"
         }
     },
     "coverage": {
-        "baseDir": "/absolute/app",
+        "baseDir": "/opt/ws/CoverageAutomation/project/app",
         "phpFile": "coverage-{branch}.serialized",
         "xmlFile": "coverage-{branch}.xml"
     }
