@@ -6,7 +6,7 @@ class CoverageAutomationTest extends PHPUnit_Framework_TestCase
 
     public static function setUpBeforeClass()
     {
-        exec(__DIR__ . '/../bin/generate-fixtures.sh');
+//        shell_exec(__DIR__ . '/../bin/generate-fixtures.sh');
     }
 
     /**
@@ -25,6 +25,9 @@ class CoverageAutomationTest extends PHPUnit_Framework_TestCase
 
         $this->writeCoverageConfig($fromCommit);
 
+        chdir(__DIR__ . '/../project');
+        exec('git checkout --detach -q ' . $toCommit);
+
         if (file_exists($coverageSerialized)) {
             unlink($coverageSerialized);
         }
@@ -32,9 +35,23 @@ class CoverageAutomationTest extends PHPUnit_Framework_TestCase
             copy($previousSerialized, $coverageSerialized);
         }
 
-        chdir(__DIR__ . '/../project');
-        exec('git checkout ' . $toCommit);
-        exec('php ' . __DIR__ . '/../bin/CoverageAutomation.php');
+        if (isset($_ENV['XDEBUG_CONFIG'])) {
+            $cmd = [
+                'php',
+                '-dxdebug.remote_enable=1',
+                '-dxdebug.remote_mode=req',
+                '-dxdebug.remote_port=9000',
+                '-dxdebug.remote_host=127.0.0.1',
+                __DIR__ . '/../bin/CoverageAutomation.php',
+            ];
+        } else {
+            $cmd = [
+                'php',
+                __DIR__ . '/../bin/CoverageAutomation.php'
+            ];
+        }
+
+        exec(join(' ', $cmd));
 
         file_put_contents(
             $coverageXml,
@@ -53,9 +70,11 @@ class CoverageAutomationTest extends PHPUnit_Framework_TestCase
         $hashes = [];
         $data   = [];
         chdir(__DIR__ . '/../project');
+        exec('git checkout -q master');
         exec('git rev-list --reverse HEAD ^' . self::START_HASH, $hashes);
 
         array_unshift($hashes, self::START_HASH);
+        reset($hashes);
 
         while (false !== next($hashes)) {
             $data[] = [

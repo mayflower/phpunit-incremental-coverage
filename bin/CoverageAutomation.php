@@ -1,12 +1,21 @@
 <?php
 
-$config     = json_decode(file_get_contents(__DIR__ . '/CoverageAutomation.json'));
-$scriptName = $GLOBALS['_SERVER']['SCRIPT_NAME'];
+$config  = json_decode(file_get_contents(__DIR__ . '/CoverageAutomation.json'));
+$phpunit = new Phar($config->phpunit->phar, 0);
+$matches = [];
 
-$GLOBALS['_SERVER']['SCRIPT_NAME'] = '-';
-include "phar://{$config->phpunit->phar}";
+preg_match_all('/[\"\']([^\"\']+)[\"\']\s*=>\s*[\"\']([^\"\']+)[\"\']/', $phpunit->getStub(), $matches);
+$classes = array_combine($matches[1], $matches[2]);
 
-$GLOBALS['_SERVER']['SCRIPT_NAME'] = $scriptName;
+spl_autoload_register(
+    function ($class) use ($classes, $config)
+    {
+        $class = str_replace('\\', '\\\\', strtolower($class));
+        if (isset($classes[$class])) {
+            require 'phar://' . $config->phpunit->phar . $classes[$class];
+        }
+    }
+);
 
 class CoverageAutomation
 {
@@ -47,14 +56,27 @@ class CoverageAutomation
 
     public function run()
     {
+        $changes = [];
+        $stashed = false;
+        chdir($this->config->git->root);
+        exec($this->config->git->cmd . ' status --porcelain', $changes);
+        if (!empty($changes)) {
+            exec($this->config->git->cmd . ' stash');
+            $stashed = true;
+        }
         $this->runCoverage();
+        if (true === $stashed) {
+            exec($this->config->git->cmd . ' stash pop');
+        }
+        $this->updateProcessedRevision();
+        $this->writeConfig();
     }
 
     private function runCoverage()
     {
         chdir($this->config->git->root);
         if (file_exists($this->phpFile)) {
-            $this->branchCoverage = unserialize(file_get_contents($this->phpFile));
+            $this->branchCoverage = $this->readCoveragePhp($this->phpFile);
             $this->diffToTests();
             $this->runChangedTests();
             $this->mergeBranchCoverage();
@@ -62,8 +84,6 @@ class CoverageAutomation
         } else {
             $this->runAllTests();
         }
-        $this->updateProcessedRevision();
-        $this->writeConfig();
     }
 
     /**
@@ -82,7 +102,7 @@ class CoverageAutomation
             '-E',
             escapeshellarg('^\+\+\+|^@@'),
         ];
-        $coverage    = $this->branchCoverage->getData();
+        $coverage    = $this->branchCoverage->getData(true);
         $testClasses = [];
         $testMethods = [];
         $diff        = [];
@@ -220,7 +240,7 @@ class CoverageAutomation
             ];
             $filter = escapeshellarg(str_replace('\\', '\\\\', join('|', $this->testsToRun)));
             passthru(join(' ', $cmd) . ' --filter ' . $filter);
-            $this->changedCoverage = unserialize(file_get_contents($tmp));
+            $this->changedCoverage = $this->readCoveragePhp($tmp);
             unlink($tmp);
         }
     }
@@ -228,22 +248,33 @@ class CoverageAutomation
     private function mergeBranchCoverage()
     {
         if ($this->changedCoverage) {
-            $this->branchCoverage->setAddUncoveredFilesFromWhitelist(true);
-
             $cleanup = new Cleanup_CodeCoverage();
             $cleanup->setFromCoverage($this->branchCoverage);
             $cleanup->removeTests($this->changedCoverage->getTests());
             $cleanup->applyDeletions($this->deletions);
             $cleanup->applyInsertions($this->insertions);
+            $cleanup->clearUncoveredForMerge($this->changedCoverage);
 
-//            $this->changedCoverage->setAddUncoveredFilesFromWhitelist(false);
             $this->branchCoverage->merge($this->changedCoverage);
         }
     }
 
+    private function readCoveragePhp($file)
+    {
+        if (version_compare(PHPUnit_Runner_Version::id(), 4, '<')) {
+            $data = unserialize(file_get_contents($file));
+        } else {
+            $data = require $file;
+        }
+
+        return $data;
+    }
+
     private function writeBranchCoverage()
     {
-        file_put_contents($this->phpFile, serialize($this->branchCoverage));
+        $php = new PHP_CodeCoverage_Report_PHP();
+        $php->process($this->branchCoverage, $this->phpFile);
+
         $clover = new PHP_CodeCoverage_Report_Clover();
         $clover->process($this->branchCoverage, $this->xmlFile);
     }
@@ -310,15 +341,51 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
             end($lines);
             $this->fillIndexes($file, key($lines));
             foreach ($lines as $line => $count) {
-                array_splice($this->data[$file], $line, 0, array_fill(0, $count, []));
+                array_splice($this->data[$file], $line, 0, array_fill(0, $count, null));
             }
         }
+    }
+
+    public function clearUncoveredForMerge(PHP_CodeCoverage $coverage)
+    {
+        $data  = $coverage->getData(true);
+        $files = array_keys($data);
+
+        foreach ($files as $file) {
+            if (isset($this->data[$file])) {
+                $lines = $this->data[$file];
+                if (!$this->isUncovered($data[$file]) && $this->isUncovered($lines)) {
+                    $this->data[$file] = [];
+                }
+            }
+        }
+    }
+
+    private function isUncovered($lines)
+    {
+        $uncovered = true;
+        if (is_array($lines)) {
+            end($lines);
+            if (key($lines) === count($lines)) {
+                $line = reset($lines);
+                while (false !== $line) {
+                    if ($line !== []) {
+                        $uncovered = false;
+                        break;
+                    }
+                    $line = next($lines);
+                }
+            } else {
+                $uncovered = false;
+            }
+        }
+        return $uncovered;
     }
 
     private function fillIndexes($file, $max)
     {
         if (!isset($this->data[$file])) {
-            $this->data[$file] = array_fill(0, $max, []);
+            $this->data[$file] = array_fill(0, $max, null);
         } else {
             $lines =& $this->data[$file];
             ksort($lines);
