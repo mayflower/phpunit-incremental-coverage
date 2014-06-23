@@ -253,7 +253,7 @@ class CoverageAutomation
             $cleanup->removeTests($this->changedCoverage->getTests());
             $cleanup->applyDeletions($this->deletions);
             $cleanup->applyInsertions($this->insertions);
-            $cleanup->clearUncoveredForMerge($this->changedCoverage);
+            $cleanup->clearFirstTimeHandledForMerge($this->changedCoverage);
 
             $this->branchCoverage->merge($this->changedCoverage);
         }
@@ -346,7 +346,7 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
         }
     }
 
-    public function clearUncoveredForMerge(PHP_CodeCoverage $coverage)
+    public function clearFirstTimeHandledForMerge(PHP_CodeCoverage $coverage)
     {
         $data  = $coverage->getData(true);
         $files = array_keys($data);
@@ -354,14 +354,14 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
         foreach ($files as $file) {
             if (isset($this->data[$file])) {
                 $lines = $this->data[$file];
-                if (!$this->isUncovered($data[$file]) && $this->isUncovered($lines)) {
+                if (!$this->isFirstTimeHandled($data[$file]) && $this->isFirstTimeHandled($lines)) {
                     $this->data[$file] = [];
                 }
             }
         }
     }
 
-    private function isUncovered($lines)
+    private function isFirstTimeHandled($lines)
     {
         $uncovered = true;
         if (is_array($lines)) {
