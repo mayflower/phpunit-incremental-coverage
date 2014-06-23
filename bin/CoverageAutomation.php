@@ -253,18 +253,16 @@ class CoverageAutomation
             $cleanup->removeTests($this->changedCoverage->getTests());
             $cleanup->applyDeletions($this->deletions);
             $cleanup->applyInsertions($this->insertions);
-            $cleanup->clearFirstTimeHandledForMerge($this->changedCoverage);
-
-            $this->branchCoverage->merge($this->changedCoverage);
+            $cleanup->merge($this->changedCoverage);
         }
     }
 
     private function readCoveragePhp($file)
     {
-        if (version_compare(PHPUnit_Runner_Version::id(), 4, '<')) {
-            $data = unserialize(file_get_contents($file));
-        } else {
+        if (version_compare(PHPUnit_Runner_Version::id(), 4, '>=')) {
             $data = require $file;
+        } else {
+            $data = unserialize(file_get_contents($file));
         }
 
         return $data;
@@ -291,18 +289,27 @@ class CoverageAutomation
 class Cleanup_CodeCoverage extends PHP_CodeCoverage
 {
     /** @var array */
-    protected $data;
+    protected $_data;
 
     /** @var array */
-    protected $tests;
+    protected $_tests;
+
+    /** @var PHP_CodeCoverage */
+    protected $coverage;
 
     /**
      * @param PHP_CodeCoverage $coverage
      */
     public function setFromCoverage(PHP_CodeCoverage $coverage)
     {
-        $this->data  =& $coverage->data;
-        $this->tests =& $coverage->tests;
+        $this->coverage = $coverage;
+        if (version_compare(PHPUnit_Runner_Version::id(), 4, '>=')) {
+            $this->_data  = $coverage->getData(true);
+            $this->_tests = $coverage->getTests();
+        } else {
+            $this->_data  =& $coverage->data;
+            $this->_tests =& $coverage->tests;
+        }
     }
 
     /**
@@ -311,16 +318,16 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
     public function removeTests($tests)
     {
         $diffTests = array_keys($tests);
-        foreach ($this->data as $file => $lines) {
+        foreach ($this->_data as $file => $lines) {
             if (!empty($lines)) {
                 foreach ($lines as $line => $coveringTests) {
                     if (!empty($coveringTests)) {
-                        $this->data[$file][$line] = array_diff($coveringTests, $diffTests);
+                        $this->_data[$file][$line] = array_diff($coveringTests, $diffTests);
                     }
                 }
             }
         }
-        $this->tests = array_diff_key($this->tests, $tests);
+        $this->_tests = array_diff_key($this->_tests, $tests);
     }
 
     public function applyDeletions($changes)
@@ -330,7 +337,7 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
             reset($lines);
             $this->fillIndexes($file, key($lines));
             foreach ($lines as $line => $count) {
-                array_splice($this->data[$file], $line, $count);
+                array_splice($this->_data[$file], $line, $count);
             }
         }
     }
@@ -341,21 +348,31 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
             end($lines);
             $this->fillIndexes($file, key($lines));
             foreach ($lines as $line => $count) {
-                array_splice($this->data[$file], $line, 0, array_fill(0, $count, null));
+                array_splice($this->_data[$file], $line, 0, array_fill(0, $count, null));
             }
         }
     }
 
-    public function clearFirstTimeHandledForMerge(PHP_CodeCoverage $coverage)
+    public function merge(PHP_CodeCoverage $coverage)
     {
-        $data  = $coverage->getData(true);
+        $this->clearFirstTimeHandledForMerge($coverage);
+        if (version_compare(PHPUnit_Runner_Version::id(), 4, '>=')) {
+            $this->coverage->setData($this->_data);
+            $this->coverage->setTests($this->_tests);
+        }
+        $this->coverage->merge($coverage);
+    }
+
+    private function clearFirstTimeHandledForMerge(PHP_CodeCoverage $coverage)
+    {
+        $data  = $coverage->getData();
         $files = array_keys($data);
 
         foreach ($files as $file) {
-            if (isset($this->data[$file])) {
-                $lines = $this->data[$file];
+            if (isset($this->_data[$file])) {
+                $lines = $this->_data[$file];
                 if (!$this->isFirstTimeHandled($data[$file]) && $this->isFirstTimeHandled($lines)) {
-                    $this->data[$file] = [];
+                    $this->_data[$file] = [];
                 }
             }
         }
@@ -384,10 +401,10 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
 
     private function fillIndexes($file, $max)
     {
-        if (!isset($this->data[$file])) {
-            $this->data[$file] = array_fill(0, $max, null);
+        if (!isset($this->_data[$file])) {
+            $this->_data[$file] = array_fill(0, $max, null);
         } else {
-            $lines =& $this->data[$file];
+            $lines =& $this->_data[$file];
             ksort($lines);
             end($lines);
             $max = max($max, key($lines));
