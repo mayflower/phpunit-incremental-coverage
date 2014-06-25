@@ -332,12 +332,24 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
 
     public function applyDeletions($changes)
     {
-        foreach ($changes as $file => $lines) {
-            $lines = array_reverse($lines, true);
-            reset($lines);
-            $this->fillIndexes($file, key($lines));
-            foreach ($lines as $line => $count) {
-                array_splice($this->_data[$file], $line, $count);
+        foreach ($changes as $deleteFile => $deleteLines) {
+            $deleteLines = array_reverse($deleteLines, true);
+            reset($deleteLines);
+            if (is_array($this->_data[$deleteFile])) {
+                $lines = array_keys($this->_data[$deleteFile]);
+                foreach ($deleteLines as $deleteLine => $deleteCount) {
+                    if (0 < $deleteCount) {
+                        foreach ($lines as $line) {
+                            if ($line < $deleteLine) {
+                                continue;
+                            }
+                            if ($line > $deleteLine + $deleteCount) {
+                                $this->_data[$deleteFile][$line - $deleteCount] = $this->_data[$deleteFile][$line];
+                            }
+                            unset($this->_data[$deleteFile][$line]);
+                        }
+                    }
+                }
             }
         }
     }
