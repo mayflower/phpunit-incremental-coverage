@@ -102,7 +102,7 @@ class CoverageAutomation
             '-E',
             escapeshellarg('^\+\+\+|^@@'),
         ];
-        $coverage    = $this->branchCoverage->getData(true);
+        $coverage    = $this->branchCoverage->getData();
         $testClasses = [];
         $testMethods = [];
         $diff        = [];
@@ -304,7 +304,7 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
     {
         $this->coverage = $coverage;
         if (version_compare(PHPUnit_Runner_Version::id(), 4, '>=')) {
-            $this->_data  = $coverage->getData(true);
+            $this->_data  = $coverage->getData();
             $this->_tests = $coverage->getTests();
         } else {
             $this->_data  =& $coverage->data;
@@ -356,11 +356,36 @@ class Cleanup_CodeCoverage extends PHP_CodeCoverage
 
     public function applyInsertions($changes)
     {
-        foreach ($changes as $file => $lines) {
-            end($lines);
-            $this->fillIndexes($file, key($lines));
-            foreach ($lines as $line => $count) {
-                array_splice($this->_data[$file], $line, 0, array_fill(0, $count, null));
+        foreach ($changes as $insertFile => $insertLines) {
+//            end($lines);
+//            $this->fillIndexes($file, key($lines));
+//            $insertLines = array_reverse($insertLines, true);
+//            reset($insertLines);
+            if (is_array($this->_data[$insertFile])) {
+                $lines = array_keys($this->_data[$insertFile]);
+                sort($lines, SORT_NUMERIC);
+                $lines = array_reverse($lines);
+                reset($lines);
+                foreach ($insertLines as $insertLine => $insertCount) {
+                    if (0 < $insertCount) {
+                        foreach ($lines as $line) {
+                            if ($line < $insertLine) {
+                                $lines = array_keys($this->_data[$insertFile]);
+                                sort($lines, SORT_NUMERIC);
+                                $lines = array_reverse($lines);
+                                reset($lines);
+                                break;
+                            }
+                            if ($line >= $insertLine) {
+                                if (isset($this->_data[$insertFile][$line])) {
+                                    $this->_data[$insertFile][$line + $insertCount] = $this->_data[$insertFile][$line];
+                                    unset($this->_data[$insertFile][$line]);
+                                }
+                            }
+                        }
+                    }
+//                array_splice($this->_data[$file], $line, 0, array_fill(0, $count, null));
+                }
             }
         }
     }
